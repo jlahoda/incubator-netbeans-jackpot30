@@ -60,7 +60,7 @@
         <download url="http://repo1.maven.org/maven2/junit/junit/3.8.2/junit-3.8.2-javadoc.jar" target="junit/junit-3.8.2-javadoc.jar" />
         <download url="http://repo1.maven.org/maven2/junit/junit/3.8.2/junit-3.8.2-sources.jar" target="junit/junit-3.8.2-sources.jar" />
 
-        <download url="http://lahoda.info/hudson/userContent/org-netbeans-modules-java-j2seproject-copylibstask.jar" target="CopyLibs/org-netbeans-modules-java-j2seproject-copylibstask.jar" />
+<!--        <download url="http://lahoda.info/hudson/userContent/org-netbeans-modules-java-j2seproject-copylibstask.jar" target="CopyLibs/org-netbeans-modules-java-j2seproject-copylibstask.jar" />-->
         
         <download url="http://central.maven.org/maven2/org/freemarker/freemarker/2.3.16/freemarker-2.3.16.jar" target="freemarker/freemarker-2.3.16.jar" />
 
@@ -93,8 +93,8 @@
         <copy file="${nbplatform.active.dir}/platform/lib/org-openide-util-lookup.jar" todir="." />
         <copy file="${nbplatform.active.dir}/ide/modules/org-netbeans-spi-editor-hints.jar" todir="." />
         <copy file="${nbplatform.active.dir}/ide/modules/org-netbeans-api-java-classpath.jar" todir="." />
-        <copy file="${nbplatform.active.dir}/java/modules/ext/nb-javac-api.jar" todir="javac" />
-        <copy file="${nbplatform.active.dir}/java/modules/ext/nb-javac-impl.jar" todir="javac" />
+<!--        <copy file="${nbplatform.active.dir}/java/modules/ext/nb-javac-api.jar" todir="javac" />
+        <copy file="${nbplatform.active.dir}/java/modules/ext/nb-javac-impl.jar" todir="javac" />-->
         <copy file="${nbplatform.active.dir}/ide/modules/org-netbeans-modules-jumpto.jar" todir="." />
         <copy file="${nbplatform.active.dir}/platform/modules/org-netbeans-modules-masterfs.jar" todir="." />
         <copy file="${nbplatform.active.dir}/ide/modules/org-netbeans-modules-parsing-lucene.jar" todir="." />
@@ -107,5 +107,6 @@
         <copy file="${nbplatform.active.dir}/java/modules/org-netbeans-spi-java-hints.jar" todir="." />
         <copy file="${nbplatform.active.dir}/java/modules/org-netbeans-lib-nbjavac.jar" todir="." />
         <copy file="${nbplatform.active.dir}/ide/modules/org-netbeans-modules-xml-lexer.jar" todir="." />
+        <copy file="${nbplatform.active.dir}/java/ant/extra/org-netbeans-modules-java-j2seproject-copylibstask.jar" todir="CopyLibs/" />
     </target>
 </project>

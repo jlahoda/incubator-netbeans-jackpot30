@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,23 +19,33 @@
 package org.netbeans.modules.java.hints.infrastructure;
 
 import com.sun.source.util.TreePath;
+
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.prefs.AbstractPreferences;
+import java.util.prefs.BackingStoreException;
+
 import javax.swing.text.Document;
+
 import org.netbeans.api.java.lexer.JavaTokenId;
 import org.netbeans.api.java.source.CompilationInfo;
 import org.netbeans.api.java.source.JavaSource;
 import org.netbeans.api.java.source.JavaSource.Phase;
+import org.netbeans.api.java.source.SourceUtils;
 import org.netbeans.api.java.source.SourceUtilsTestUtil;
+import org.netbeans.api.java.source.SourceUtilsTestUtil2;
 import org.netbeans.api.java.source.TestUtilities;
 import org.netbeans.api.lexer.Language;
 import org.netbeans.junit.NbTestCase;
-import org.netbeans.modules.java.source.TreeLoader;
+import org.netbeans.junit.RandomlyFails;
+import org.netbeans.modules.java.hints.legacy.spi.RulesManager;
+import org.netbeans.modules.java.hints.legacy.spi.RulesManager.LegacyHintConfiguration;
 import org.netbeans.spi.editor.hints.ErrorDescription;
 import org.netbeans.spi.editor.hints.Fix;
 import org.openide.LifecycleManager;
@@ -64,7 +74,7 @@ public abstract class TreeRuleTestBase extends NbTestCase {
     protected void setUp() throws Exception {
         super.setUp();
         SourceUtilsTestUtil.prepareTest(new String[] {"org/netbeans/modules/java/editor/resources/layer.xml"}, new Object[0]);
-        TreeLoader.DISABLE_CONFINEMENT_TEST = true;
+        SourceUtilsTestUtil2.disableConfinementTest();
     }
 
     private void prepareTest(String fileName, String code) throws Exception {
@@ -74,6 +84,11 @@ public abstract class TreeRuleTestBase extends NbTestCase {
 
         FileObject wd = FileUtil.toFileObject(wdFile);
         assertNotNull(wd);
+
+        if (subTest != null) {
+            wd = FileUtil.createFolder(wd, "st" + subTest);
+        }
+
         sourceRoot = FileUtil.createFolder(wd, "src");
         FileObject buildRoot = FileUtil.createFolder(wd, "build");
         FileObject cache = FileUtil.createFolder(wd, "cache");
@@ -84,7 +99,8 @@ public abstract class TreeRuleTestBase extends NbTestCase {
         assertNotNull(dataFile);
         
         TestUtilities.copyStringToFile(dataFile, code);
-        
+
+        SourceUtilsTestUtil.setSourceLevel(data, sourceLevel);
         SourceUtilsTestUtil.prepareTest(sourceRoot, buildRoot, cache, extraClassPath());
         
         DataObject od = DataObject.find(data);
@@ -104,15 +120,30 @@ public abstract class TreeRuleTestBase extends NbTestCase {
         
         assertNotNull(info);
     }
-    
+
+    private String sourceLevel = "1.5";
     private FileObject sourceRoot;
     private CompilationInfo info;
     private Document doc;
+
+    protected void setSourceLevel(String sourceLevel) {
+        this.sourceLevel = sourceLevel;
+    }
     
     protected abstract List<ErrorDescription> computeErrors(CompilationInfo info, TreePath path);
     
     protected List<ErrorDescription> computeErrors(CompilationInfo info, TreePath path, int offset) {
         return computeErrors(info, path);
+    }
+
+    @Override
+    public void runTest() throws Throwable {
+        RulesManager.currentHintPreferences.set(new LegacyHintConfiguration(true, null, new TempPreferences()));
+        try {
+            super.runTest();
+        } finally {
+            RulesManager.currentHintPreferences.set(null);
+        }
     }
     
     protected String toDebugString(CompilationInfo info, Fix f) {
@@ -226,18 +257,25 @@ public abstract class TreeRuleTestBase extends NbTestCase {
         return new FileObject[0];
     }
 
+    private Integer subTest;
+    
     // common tests to check nothing is reported
+    @RandomlyFails
     public void testIssue105979() throws Exception {
         String before = "package test; class Test {" +
                 "  return b;" +
                 "}\n";
 
         for (int i = 0; i < before.length(); i++) {
+            subTest = i;
             LOG.info("testing position " + i + " at " + before.charAt(i));
+            SourceUtils.waitScanFinished();
             clearWorkDir();
             performAnalysisTest("test/Test.java", before, i);
 }
     }
+    
+    @RandomlyFails
     public void testIssue108246() throws Exception {
 
         String before = "package test; class Test {" +
@@ -246,12 +284,15 @@ public abstract class TreeRuleTestBase extends NbTestCase {
             "\n}\n";
 
         for (int i = 0; i < before.length(); i++) {
+            subTest = i;
             LOG.info("testing position " + i + " at " + before.charAt(i));
+            SourceUtils.waitScanFinished();
             clearWorkDir();
             performAnalysisTest("test/Test.java", before, i);
         }
     }
 
+    @RandomlyFails
     public void testNoHintsForSimpleInitialize() throws Exception {
 
         String before = "package test; class Test {" +
@@ -259,12 +300,15 @@ public abstract class TreeRuleTestBase extends NbTestCase {
             "}\n";
 
         for (int i = 0; i < before.length(); i++) {
+            subTest = i;
             LOG.info("testing position " + i + " at " + before.charAt(i));
+            SourceUtils.waitScanFinished();
             clearWorkDir();
             performAnalysisTest("test/Test.java", before, i);
         }
     }
 
+    @RandomlyFails
     public void testIssue113933() throws Exception {
 
         String before = "package test; class Test {" +
@@ -273,9 +317,76 @@ public abstract class TreeRuleTestBase extends NbTestCase {
             "\n}\n}\n";
 
         for (int i = 0; i < before.length(); i++) {
+            subTest = i;
             LOG.info("testing position " + i + " at " + before.charAt(i));
+            SourceUtils.waitScanFinished();
             clearWorkDir();
             performAnalysisTest("test/Test.java", before, i);
+        }
+    }
+
+    private static class TempPreferences extends AbstractPreferences {
+
+        /*private*/Properties properties;
+
+        private TempPreferences() {
+            super(null, "");
+        }
+
+        private  TempPreferences(TempPreferences parent, String name)  {
+            super(parent, name);
+            newNode = true;
+        }
+
+        protected final String getSpi(String key) {
+            return properties().getProperty(key);
+        }
+
+        protected final String[] childrenNamesSpi() throws BackingStoreException {
+            return new String[0];
+        }
+
+        protected final String[] keysSpi() throws BackingStoreException {
+            return properties().keySet().toArray(new String[0]);
+        }
+
+        protected final void putSpi(String key, String value) {
+            properties().put(key,value);
+        }
+
+        protected final void removeSpi(String key) {
+            properties().remove(key);
+        }
+
+        protected final void removeNodeSpi() throws BackingStoreException {}
+        protected  void flushSpi() throws BackingStoreException {}
+        protected void syncSpi() throws BackingStoreException {
+            properties().clear();
+        }
+
+        @Override
+        public void put(String key, String value) {
+            try {
+                super.put(key, value);
+            } catch (IllegalArgumentException iae) {
+                if (iae.getMessage().contains("too long")) {
+                    // Not for us!
+                    putSpi(key, value);
+                } else {
+                    throw iae;
+                }
+            }
+        }
+
+        Properties properties()  {
+            if (properties == null) {
+                properties = new Properties();
+            }
+            return properties;
+        }
+
+        protected AbstractPreferences childSpi(String name) {
+            return new TempPreferences(this, name);
         }
     }
 }

@@ -23,7 +23,7 @@ import com.sun.source.tree.Tree;
 import com.sun.source.util.JavacTask;
 import com.sun.tools.javac.api.JavacTaskImpl;
 import com.sun.tools.javac.code.Symbol.ClassSymbol;
-import com.sun.tools.javac.model.LazyTreeLoader;
+//import com.sun.tools.javac.model.LazyTreeLoader;
 import com.sun.tools.javac.util.Abort;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Context.Factory;
@@ -77,7 +77,6 @@ public class Javac {
     }
 
     private final SourceRoot sourceRoot;
-    private final AtomicReference<JavacTaskImpl> javacTask = new AtomicReference<JavacTaskImpl>();
     private final Map<String, CompilationInfo> path2CUT = new HashMap<String, CompilationInfo>();
 
     private Javac(SourceRoot sourceRoot) {
@@ -89,42 +88,22 @@ public class Javac {
 
         if (result == null) {
             String content = org.netbeans.modules.jackpot30.source.api.API.readFileContent(sourceRoot.getCategory(), relativePath).replace("\r\n", "\n");
-            CompilationUnitTree cut;
 
-            try {
-                cut = doParse(relativePath, content);
-            } catch (ThreadDeath td) {
-                throw td;
-            } catch (Throwable ignore) {
-                javacTask.set(null);
-                cut = doParse(relativePath, content);
-            }
+            JavacTaskImpl javac = (JavacTaskImpl) getTask(new FileObjectImpl(relativePath, content));
+            Iterable<? extends CompilationUnitTree> cuts = javac.parse();
+            CompilationUnitTree cut = cuts.iterator().next();
 
-            path2CUT.put(relativePath, result = new CompilationInfo(this, cut, content));
+            javac.analyze(javac.enter(Collections.singletonList(cut)));
+
+            path2CUT.put(relativePath, result = new CompilationInfo(javac, cut, content));
         }
 
         return result;
     }
 
-    private CompilationUnitTree doParse(String relativePath, String content) throws IOException {
-        JavacTaskImpl javac = (JavacTaskImpl) getTask();
-        Iterable<? extends CompilationUnitTree> cuts = javac.parse(new FileObjectImpl(relativePath, content));
-        CompilationUnitTree cut = cuts.iterator().next();
-
-        javac.analyze(javac.enter(Collections.singletonList(cut)));
-        return cut;
-    }
-
-    public JavacTask getTask() {
-        JavacTaskImpl jti = javacTask.get();
-
-        if (jti == null) {
-            FMImpl fm = new FMImpl(sourceRoot.getClassPath());
-            javacTask.set(jti = JavacCreator.create(null, fm, null, Arrays.asList("-Xjcov", "-proc:none", "-XDshouldStopPolicy=FLOW"), null, Collections.<JavaFileObject>emptyList()));
-            TreeLoaderImpl.preRegister(jti.getContext());
-        }
-
-        return jti;
+    private JavacTask getTask(JavaFileObject input) {
+        FMImpl fm = new FMImpl(sourceRoot.getClassPath());
+        return JavacCreator.create(null, fm, null, Arrays.asList("-Xjcov", "-proc:none", "-XDshouldStopPolicy=FLOW"), null, Collections.singletonList(input));
     }
 
     private static class FileObjectImpl extends SimpleJavaFileObject {
@@ -316,23 +295,4 @@ public class Javac {
 
     }
 
-    private static final class TreeLoaderImpl extends LazyTreeLoader {
-        public static void preRegister(Context ctx) {
-            ctx.put(lazyTreeLoaderKey, new Factory<LazyTreeLoader>() {
-                @Override public LazyTreeLoader make(Context ctx) {
-                    return new TreeLoaderImpl(ctx);
-                }
-            });
-        }
-
-        public TreeLoaderImpl(Context ctx) {
-            ctx.put(lazyTreeLoaderKey, this);
-        }
-
-        @Override
-        public void couplingError(ClassSymbol clazz, Tree t) {
-            //ignore...
-        }
-
-    }
 }

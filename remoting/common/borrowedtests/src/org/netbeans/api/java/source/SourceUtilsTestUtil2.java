@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,7 +20,11 @@ package org.netbeans.api.java.source;
 
 import com.sun.source.tree.Tree;
 import org.apache.lucene.store.FSDirectory;
+import org.netbeans.modules.java.source.parsing.JavacParser;
+import org.netbeans.modules.java.source.parsing.JavacParser.TreeLoaderRegistry;
 import org.netbeans.modules.java.source.transform.Transformer;
+import org.openide.util.Exceptions;
+import org.openide.util.Lookup;
 
 /**
  *
@@ -52,7 +56,23 @@ public final class SourceUtilsTestUtil2 {
     }
     
     public static void disableLocks() {
-//        FSDirectory.setDisableLocks(true);
     }
-    
+
+    public static void disableArtificalParameterNames() {
+        try {
+            Class treeLoader = Class.forName("org.netbeans.modules.java.source.nbjavac.parsing.TreeLoader");
+            treeLoader.getField("DISABLE_ARTIFICAL_PARAMETER_NAMES").set(null, true);
+        } catch (Exception ex) {
+            //ignore
+        }
+    }
+
+    public static void disableConfinementTest() {
+        try {
+            Class treeLoader = Class.forName("org.netbeans.modules.java.source.nbjavac.parsing.TreeLoader");
+            treeLoader.getField("DISABLE_CONFINEMENT_TEST").set(null, true);
+        } catch (Exception ex) {
+            //ignore
+        }
+    }
 }

@@ -32,12 +32,12 @@ import org.netbeans.api.lexer.TokenHierarchy;
  */
 public class CompilationInfo {
 
-    private final Javac javac;
+    private final JavacTask javac;
     private final CompilationUnitTree cut;
     private final String text;
     private final TokenHierarchy<?> th;
 
-    public CompilationInfo(Javac javac, CompilationUnitTree cut, String text) {
+    public CompilationInfo(JavacTask javac, CompilationUnitTree cut, String text) {
         this.javac = javac;
         this.cut = cut;
         this.text = text;
@@ -45,15 +45,15 @@ public class CompilationInfo {
     }
 
     public /*@NonNull*/ Trees getTrees() {
-        return Trees.instance(javac.getTask());
+        return Trees.instance(javac);
     }
 
     public /*@NonNull*/ Types getTypes() {
-        return javac.getTask().getTypes();
+        return javac.getTypes();
     }
 
     public /*@NonNull*/ Elements getElements() {
-	return javac.getTask().getElements();
+	return javac.getElements();
     }
 
     public CompilationUnitTree getCompilationUnit() {
@@ -69,6 +69,6 @@ public class CompilationInfo {
     }
 
     public JavacTask getJavacTask() {
-        return javac.getTask();
+        return javac;
     }
 }
