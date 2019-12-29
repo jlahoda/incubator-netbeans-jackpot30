@@ -160,6 +160,7 @@ public class HandlePullRequest extends OptionProcessor {
                             switch (line.getLineType()) {
                                 case NEUTRAL: pointer++; idx++; break;
                                 case TO: remap[pointer++] = idx++; break;
+                                case FROM: idx++; break;
                             }
                         }
                     }
