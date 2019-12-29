@@ -227,6 +227,7 @@ public class HandlePullRequest extends OptionProcessor {
                         if (commentGitHub[0] == null) {
                             commentGitHub[0] = factory.create(oauthAppToken);
                         }
+                        System.err.println("creating review comment, location: " + fileData.filename + ":" + targetPosition + ", text: " + comment);
                         commentGitHub[0].createReviewComment(fullRepoName, prId, comment, sha, fileData.filename, targetPosition);
                     }
                 }, false).get();
