@@ -43,6 +43,9 @@ import javax.ws.rs.core.MediaType;
  */
 @Path("/github/notify")
 public class WebAppNotify {
+
+    private static final String NO_STATUS_GITHUB = "<no-status-github>";
+
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     public static void webhook(String data) throws IOException {
@@ -78,7 +81,7 @@ public class WebAppNotify {
         }
         builder.environment().put("PR_CONTENT", data);
         //XXX: how to handle the access tokens?
-        builder.environment().put("OAUTH_TOKEN", Config.getDefault().getPreferences().node("users").node(userAndRepo[0]).get("access_token", ""));
+        builder.environment().put("OAUTH_TOKEN", Config.getDefault().getPreferences().node("users").node(userAndRepo[0]).get("access_token", NO_STATUS_GITHUB));
         builder.environment().put("OAUTH_APP_TOKEN", Config.getDefault().getPreferences().node("app").get("access_token", ""));
         java.nio.file.Path targetDir = Config.getDefault().getRunDir().resolve("github").resolve((String) repository.get("full_name"));
         java.nio.file.Path thisPRDir = targetDir.resolve(String.valueOf((Integer) pullRequest.get("number")));

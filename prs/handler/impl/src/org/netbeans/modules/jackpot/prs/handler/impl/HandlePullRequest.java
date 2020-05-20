@@ -24,6 +24,7 @@ import io.reflectoring.diffparser.api.model.Diff;
 import io.reflectoring.diffparser.api.model.Hunk;
 import io.reflectoring.diffparser.api.model.Line;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
@@ -75,6 +76,7 @@ import org.openide.util.lookup.ServiceProvider;
 public class HandlePullRequest extends OptionProcessor {
     
     private static final Option HANDLE_PULL_REQUEST = Option.withoutArgument('\0', "handle-pull-request");
+    private static final String NO_STATUS_GITHUB = "<no-status-github>";
     public static Factory factory = GHSite.FACTORY;
 
     protected Set<Option> getOptions() {
@@ -110,7 +112,7 @@ public class HandlePullRequest extends OptionProcessor {
         Map<String, Object> head = (Map<String, Object>) pullRequest.get("head");
         Map<String, Object> headRepo = (Map<String, Object>) head.get("repo");
         
-        SiteWrapper statusGithub = factory.create(oauthToken);
+        SiteWrapper statusGithub = NO_STATUS_GITHUB.equals(oauthToken) ? new NoopSiteWrapper() : factory.create(oauthToken);
         String fullRepoName = (String) baseRepo.get("full_name");
         String sha = (String) head.get("sha");
         
@@ -333,5 +335,28 @@ public class HandlePullRequest extends OptionProcessor {
             return null;
         }
         
+    }
+
+    private static class NoopSiteWrapper implements SiteWrapper {
+
+        public NoopSiteWrapper() {
+        }
+
+        @Override
+        public void createCommitStatusPending(String fullRepoName, String sha, String text) throws IOException {
+        }
+
+        @Override
+        public void createCommitStatusSuccess(String fullRepoName, String sha, String text) throws IOException {
+        }
+
+        @Override
+        public void createReviewComment(String fullRepoName, int prId, String comment, String sha, String filename, int targetPosition) throws IOException {
+        }
+
+        @Override
+        public List<ReviewComment> getReviewComments(String fullRepoName, int prId) throws IOException {
+            return Collections.emptyList();
+        }
     }
 }
