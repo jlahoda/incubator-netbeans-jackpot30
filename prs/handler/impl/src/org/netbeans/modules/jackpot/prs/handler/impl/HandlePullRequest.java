@@ -26,6 +26,7 @@ import io.reflectoring.diffparser.api.model.Line;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.Arrays;
@@ -66,6 +67,7 @@ import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 import org.openide.modules.Places;
 import org.openide.util.Exceptions;
+import org.openide.util.Pair;
 import org.openide.util.lookup.ServiceProvider;
 
 /**
@@ -132,48 +134,10 @@ public class HandlePullRequest extends OptionProcessor {
             Project prj = FileOwnerQuery.getOwner(jlmSourceVersion); //ensure external roots (tests) are registered
             ProjectUtils.getSources(prj).getSourceGroups(Sources.TYPE_GENERIC); //register external roots
         }
-        Set<Project> projects = new HashSet<>();
-        Map<FileObject, FileData> file2Remap = new HashMap<>();
         String diffURL = (String) pullRequest.get("diff_url");
-        URLConnection conn = new URL(diffURL).openConnection();
-        String text;
-        try (InputStream in = conn.getInputStream()) {
-            String encoding = conn.getContentEncoding();
-            if (encoding == null) encoding = "UTF-8";
-            //workaround for the diff parser, which does not handle git diffs properly:
-            text = new String(in.readAllBytes(), encoding)
-                    .replace("\ndiff --git", "\n\ndiff --git");
-        }
-        List<Diff> diffs = new UnifiedDiffParser().parse(text.getBytes());
-        for (Diff diff : diffs) {
-            String filename = diff.getToFileName().substring(2);
-            if (filename.endsWith(".java")) {
-                FileObject file = workdir.getFileObject(filename);
-                if (file == null) {
-                    //TODO: how to handle? log?
-                    continue;
-                }
-                Project project = FileOwnerQuery.getOwner(file);
-                if (project != null) {
-                    int[] remap = new int[file.asLines().size() + 1]; //TODO: encoding?
-                    Arrays.fill(remap, -1);
-                    int idx = 1;
-                    for (Hunk hunk : diff.getHunks()) {
-                        int pointer = hunk.getToFileRange().getLineStart();
-                        for (Line line : hunk.getLines()) {
-                            switch (line.getLineType()) {
-                                case NEUTRAL: pointer++; idx++; break;
-                                case TO: remap[pointer++] = idx++; break;
-                            }
-                        }
-                    }
-                    projects.add(project);
-                    file2Remap.put(file, new FileData(filename, remap));
-                } else {
-                    System.err.println("no project found for: " + filename);
-                }
-            }
-        }
+        var parsedDiff = parseDiff(diffURL, workdir);
+        var projects = parsedDiff.first();
+        var file2Remap = parsedDiff.second();
         int prId = (int) pullRequest.get("number");
         SiteWrapper[] commentGitHub = new SiteWrapper[1];
         boolean[] hasWarnings = {false};
@@ -297,7 +261,7 @@ public class HandlePullRequest extends OptionProcessor {
         statusGithub.createCommitStatusSuccess(fullRepoName, sha, mainComment);
     }
     
-    private static final class FileData {
+    static final class FileData {
         public final String filename;
         public final int[] remap;
 
@@ -358,5 +322,52 @@ public class HandlePullRequest extends OptionProcessor {
         public List<ReviewComment> getReviewComments(String fullRepoName, int prId) throws IOException {
             return Collections.emptyList();
         }
+    }
+
+    static Pair<Set<Project>, Map<FileObject, FileData>> parseDiff(String diffURL, FileObject workdir) throws MalformedURLException, IOException {
+        Set<Project> projects = new HashSet<>();
+        Map<FileObject, FileData> file2Remap = new HashMap<>();
+        URLConnection conn = new URL(diffURL).openConnection();
+        String text;
+        try (InputStream in = conn.getInputStream()) {
+            String encoding = conn.getContentEncoding();
+            if (encoding == null) encoding = "UTF-8";
+            //workaround for the diff parser, which does not handle git diffs properly:
+            text = new String(in.readAllBytes(), encoding)
+                    .replace("\ndiff --git", "\n\ndiff --git");
+        }
+        List<Diff> diffs = new UnifiedDiffParser().parse(text.getBytes());
+        for (Diff diff : diffs) {
+            String filename = diff.getToFileName().substring(2);
+            if (filename.endsWith(".java")) {
+                FileObject file = workdir.getFileObject(filename);
+                if (file == null) {
+                    //TODO: how to handle? log?
+                    continue;
+                }
+                Project project = FileOwnerQuery.getOwner(file);
+                if (project != null) {
+                    int[] remap = new int[file.asLines().size() + 1]; //TODO: encoding?
+                    Arrays.fill(remap, -1);
+                    int idx = 0;
+                    for (Hunk hunk : diff.getHunks()) {
+                        idx++;
+                        int pointer = hunk.getToFileRange().getLineStart();
+                        for (Line line : hunk.getLines()) {
+                            switch (line.getLineType()) {
+                                case NEUTRAL: pointer++; idx++; break;
+                                case TO: remap[pointer++] = idx++; break;
+                                case FROM: idx++; break;
+                            }
+                        }
+                    }
+                    projects.add(project);
+                    file2Remap.put(file, new FileData(filename, remap));
+                } else {
+                    System.err.println("no project found for: " + filename);
+                }
+            }
+        }
+        return Pair.of(projects, file2Remap);
     }
 }
