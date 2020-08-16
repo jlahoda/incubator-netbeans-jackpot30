@@ -23,12 +23,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.Writer;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
 import java.util.prefs.Preferences;
 import java.util.zip.GZIPOutputStream;
@@ -45,6 +45,7 @@ import javax.ws.rs.core.MediaType;
 public class WebAppNotify {
 
     private static final String NO_STATUS_GITHUB = "<no-status-github>";
+    private static final ExecutorService WORKER = Executors.newFixedThreadPool(1);
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
@@ -110,35 +111,39 @@ public class WebAppNotify {
         Files.createDirectories(thisRunDir);
         Files.deleteIfExists(thisRunDir.resolve("finished"));
         Files.newOutputStream(thisRunDir.resolve("preparing")).close();
-        java.nio.file.Path stdout = thisRunDir.resolve("stdout");
-        builder.redirectOutput(stdout.toFile());
-        java.nio.file.Path stderr = thisRunDir.resolve("stderr");
-        builder.redirectError(stderr.toFile());
-        Process process = builder.start();
-        Files.newOutputStream(thisRunDir.resolve("running")).close();
-        Files.delete(thisRunDir.resolve("preparing"));
-        new Thread(() -> {
-            while (true) {
-                try {
-                    process.waitFor();
-                    break;
-                } catch (InterruptedException ex) {
-                    //ignore...
+        WORKER.submit(() -> {
+            try {
+                java.nio.file.Path stdout = thisRunDir.resolve("stdout");
+                builder.redirectOutput(stdout.toFile());
+                java.nio.file.Path stderr = thisRunDir.resolve("stderr");
+                builder.redirectError(stderr.toFile());
+                Process process = builder.start();
+                Files.newOutputStream(thisRunDir.resolve("running")).close();
+                Files.delete(thisRunDir.resolve("preparing"));
+                while (true) {
+                    try {
+                        process.waitFor();
+                        break;
+                    } catch (InterruptedException ex) {
+                        //ignore...
+                    }
                 }
+                try {
+                    Files.newOutputStream(thisRunDir.resolve("finished")).close();
+                } catch (IOException ex) {
+                    WebApp.LOG.log(Level.SEVERE, null, ex);
+                }
+                try {
+                    Files.delete(thisRunDir.resolve("running"));
+                } catch (IOException ex) {
+                    WebApp.LOG.log(Level.SEVERE, null, ex);
+                }
+                pack(stdout);
+                pack(stderr);
+            } catch (Throwable t) {
+                WebApp.LOG.log(Level.SEVERE, null, t);
             }
-            try {
-                Files.newOutputStream(thisRunDir.resolve("finished")).close();
-            } catch (IOException ex) {
-                WebApp.LOG.log(Level.SEVERE, null, ex);
-            }
-            try {
-                Files.delete(thisRunDir.resolve("running"));
-            } catch (IOException ex) {
-                WebApp.LOG.log(Level.SEVERE, null, ex);
-            }
-            pack(stdout);
-            pack(stderr);
-        }).start();
+        });
     }
 
     private static void pack(java.nio.file.Path log) {
